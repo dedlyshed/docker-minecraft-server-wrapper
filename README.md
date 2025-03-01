@@ -1,4 +1,4 @@
-# 1.20.1 Fabric Minecraft server in docker
+# 1.21.1 Fabric Minecraft server in docker
 
 ## Build:
 
@@ -17,7 +17,7 @@ docker build -t dedlyshed-mc-server .
 - ### For existing servers:
 
     ```bash
-    mv /path/to/your/mc-1.20.1-server/* server-data/
+    mv /path/to/your/mc-1.21.1-server/* server-data/
     ```
 
     Edit file and configure rcon `server.properties` as follows:
