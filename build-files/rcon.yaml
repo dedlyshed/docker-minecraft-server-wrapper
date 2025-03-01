@@ -1,5 +1,5 @@
 default:
   address: "localhost:25575"
-  password: "balconium"
+  password: "minecraft"
   log: "rcon-default.log"
   timeout: "10s"
