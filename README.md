@@ -1,6 +1,10 @@
-# 1.21.1 Fabric Minecraft server in docker
+# Minecraft Server wrapper in docker
 
-## Build:
+## Purpose
+
+I made this wrapper to run my different Minecraft servers in my homelab Kubernetes cluster; therefore, it requires a Docker container as a wrapper. The main advantage of this wrapper is that it is lightweight, allows the server to shut down gracefully with docker stop or CTRL+C, and enables executing Minecraft commands with docker exec while displaying Minecraft logs.
+
+## Build
 
 ```
 docker build -t dedlyshed-mc-server .
