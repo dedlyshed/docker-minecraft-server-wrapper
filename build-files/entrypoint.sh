@@ -1,5 +1,7 @@
 #!/bin/sh
 
+SERVER_PROPERTIES="/server/data/server.properties"
+
 # Function to handle signals and gracefully stop server
 stop-server() {
     echo "Caught signal! Gracefully stopping server..."
@@ -12,23 +14,38 @@ stop-server() {
 # Trap SIGINT (Ctrl+C) and SIGTERM (kill -15)
 trap stop-server SIGINT SIGTERM
 
-echo "Ensuring essential server files are in place..."
-
-if [ ! -f /server/data/fabric-server.jar ]; then
-    echo "Restoring default fabric-server.jar..."
-    cp /server/fabric-server.jar /server/data/fabric-server.jar
-fi
-
-if [ ! -f /server/data/server.properties ]; then
+if [ ! -f "$SERVER_PROPERTIES" ]; then
     echo "Restoring default server.properties..."
-    cp /server/server.properties /server/data/server.properties
+    cp /server/server.properties "$SERVER_PROPERTIES"
 fi
+
+# In case importing existing server, this will overwrite rcon settings
+awk -F= '
+BEGIN {
+    updated["enable-rcon"] = "true";
+    updated["rcon.password"] = "minecraft";
+    updated["rcon.port"] = "25575";
+}
+{
+    key = $1;
+    if (key in updated) {
+        print key "=" updated[key];
+        delete updated[key];  # Remove from the update list once modified
+    } else {
+        print $0;
+    }
+}
+END {
+    for (key in updated) print key "=" updated[key];  # Append missing keys
+}' "$SERVER_PROPERTIES" > temp && mv temp "$SERVER_PROPERTIES"
 
 if [ "$EULA" = "true" ]; then
     echo "eula=true" > /server/data/eula.txt
 fi
 
-nohup java -Xmx4G -jar fabric-server.jar nogui > /dev/null 2>&1 &
+echo "Starting server with params: $@"
+
+nohup java "$@" > /dev/null 2>&1 &
 
 # Get the Java process PID
 JAVA_PID=$!
