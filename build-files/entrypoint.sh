@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail 
 
+echo "[Server wrapper] Starting wrapper."
+
 SERVER_DATA_DIR="/server/data"
 SERVER_PROPERTIES_FILE="server.properties"
 RCON_PORT="${RCON_PORT:-25575}"
@@ -14,7 +16,7 @@ JAVA_PID=0 # define globally
 mkdir -p "$SERVER_DATA_DIR"
 cd "$SERVER_DATA_DIR"
 
-echo "Applying configuration..."
+echo "[Server wrapper] Applying configuration..."
 
 cat > "$RCON_CONFIG_FILE" <<EOF
 default:
@@ -25,11 +27,11 @@ default:
 EOF
 
 if [ ! -f "$SERVER_PROPERTIES_FILE" ]; then
-    echo "No Minecraft server properties file found, generating a new one..."
+    echo "[Server wrapper] No Minecraft server properties file found, generating a new one..."
     echo "# Minecraft server properties - Generated on $(date)" > "$SERVER_PROPERTIES_FILE"
 fi
 
-echo "Ensuring correct parameters in server properties file..."
+echo "[Server wrapper] Ensuring correct parameters in server properties file..."
 
 awk -v rcon_port="$RCON_PORT" \
     -v rcon_pass="$RCON_PASSWORD" \
@@ -81,38 +83,38 @@ END {
 }' "$SERVER_PROPERTIES_FILE" > "${SERVER_PROPERTIES_FILE}.tmp" && mv "${SERVER_PROPERTIES_FILE}.tmp" "$SERVER_PROPERTIES_FILE"
 
 if [ "${EULA:-false}" != "true" ]; then
-    echo >&2 "ERROR: You must accept the Minecraft EULA to run the server."
-    echo >&2 "Please set the environment variable EULA=true to indicate your agreement."
+    echo >&2 "[Server wrapper] ERROR: You must accept the Minecraft EULA to run the server."
+    echo >&2 "[Server wrapper] Please set the environment variable EULA=true to indicate your agreement."
     exit 1
 fi
 
-echo "EULA accepted. Creating eula.txt file..."
+echo "[Server wrapper] EULA accepted. Creating eula.txt file..."
 echo "eula=true" > "eula.txt"
 
 # Function to handle signals and gracefully stop server
 stop-server() {
-    echo "Caught signal! Gracefully stopping server..."
+    echo "[Server wrapper] Caught signal! Gracefully stopping server..."
     rcon-cli --config "$RCON_CONFIG_FILE" "kick @a GTFO, Server is shutting down! Have a nice day!" stop
 
     wait $JAVA_PID  # Wait for Java process to fully exit
-    echo "Shutdown complete."
+    echo "[Server wrapper] Shutdown complete."
     exit 0
 }
 
 # Trap SIGINT (Ctrl+C) and SIGTERM (kill -15)
 trap stop-server SIGINT SIGTERM
 
-echo "Starting server with params: $@"
+echo "[Server wrapper] Starting server with params: $@"
 
 java "$@" &
 
 # Get the Java process PID
 JAVA_PID=$!
 
-echo "Minecraft server (PID: $JAVA_PID) is now running!"
+echo "[Server wrapper] Minecraft server (PID: $JAVA_PID) is now running!"
 
 # Keep script alive to handle termination signals properly
 wait $JAVA_PID
 
 # When Java process exits (manually via rcon, in-game comamand or crash), stop tail to let the container exit properly
-echo "Minecraft server process has stopped. Exiting wrapper."
+echo "[Server wrapper] Minecraft server process has stopped. Exiting wrapper."
