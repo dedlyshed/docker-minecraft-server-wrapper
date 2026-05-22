@@ -2,20 +2,20 @@
 
 ## Purpose
 
-I made this wrapper to run my different Minecraft servers in my homelab Kubernetes cluster; therefore, it requires a Docker container as a wrapper. The main advantage of this wrapper is that it is lightweight, allows the server to shut down gracefully with docker stop or CTRL+C, and enables executing Minecraft commands with docker exec while displaying Minecraft logs.
+I made this wrapper to run my different Minecraft servers in my homelab Kubernetes cluster; therefore, it requires a Docker container as a wrapper. The main advantages are: lightweight, graceful shutdown on `docker stop` or CTRL+C, executing Minecraft commands via `docker exec`, and a built-in `backup` command for world archiving with optional S3 upload.
 
 ## Pull
 
 ```bash
-docker pull ghcr.io/dedlyshed/dedlyshed-mc-server:1.1
+docker pull ghcr.io/dedlyshed/dedlyshed-mc-server:1.2
 ```
 
 ## Build
 
 ```bash
-docker build \
+docker buildx build \
   -t dedlyshed-mc-server \
-  -t ghcr.io/dedlyshed/dedlyshed-mc-server:1.1 \
+  -t ghcr.io/dedlyshed/dedlyshed-mc-server:1.2 \
   -t ghcr.io/dedlyshed/dedlyshed-mc-server:latest \
   .
 ```
@@ -64,14 +64,67 @@ docker run -d \
 Tag and push to GitHub Container Registry:
 
 ```bash
-docker tag ghcr.io/dedlyshed/dedlyshed-mc-server:1.1 ghcr.io/dedlyshed/dedlyshed-mc-server:latest
+docker tag ghcr.io/dedlyshed/dedlyshed-mc-server:1.2 ghcr.io/dedlyshed/dedlyshed-mc-server:latest
 
 export CR_PAT='<your_token_here>'
 echo "$CR_PAT" | docker login ghcr.io -u dedlyshed --password-stdin
 
-docker push ghcr.io/dedlyshed/dedlyshed-mc-server:1.1
+docker push ghcr.io/dedlyshed/dedlyshed-mc-server:1.2
 docker push ghcr.io/dedlyshed/dedlyshed-mc-server:latest
 ```
+
+## Backup
+
+Run a one-shot backup by passing `backup` as the command. Designed to be used as a K8s CronJob against the same data volume as the server.
+
+### Example 1: Local backup only
+
+```bash
+docker run -d --rm \
+    --name mc-backup \
+    --user "$(id -u):$(id -g)" \
+    -e BACKUP_ID=survival \
+    -e BACKUP_RETAIN=7 \
+    -v ./server-data:/server/data \
+    ghcr.io/dedlyshed/dedlyshed-mc-server:latest \
+    backup
+
+docker logs -f mc-backup
+```
+
+### Example 2: Backup with S3 upload
+
+```bash
+docker run -d --rm \
+    --name mc-backup \
+    --user "$(id -u):$(id -g)" \
+    -e BACKUP_ID=my-server \
+    -e S3_UPLOAD=true \
+    -e S3_BUCKET=my-mc-backups \
+    -e S3_ENDPOINT=https://s3.example.com \
+    -e AWS_ACCESS_KEY_ID=<key> \
+    -e AWS_SECRET_ACCESS_KEY=<secret> \
+    -e AWS_REGION=us-east-1 \
+    -v ./server-data:/server/data \
+    ghcr.io/dedlyshed/dedlyshed-mc-server:latest \
+    backup
+
+docker logs -f mc-backup
+```
+
+Creates `<BACKUP_ID>-YYYYMMDD-HHMMSS.tar.gz` in `BACKUP_DIR`, then rotates old archives (scoped to `BACKUP_ID`). If `S3_UPLOAD=true`, uploads via [s5cmd](https://github.com/peak/s5cmd) and applies the same rotation to the bucket.
+
+| Variable | Default | |
+|---|---|---|
+| `BACKUP_DIR` | `/server/data/backups` | Mount a dedicated PVC in K8s |
+| `BACKUP_ID` | world name | Scope rotation when sharing a dir/bucket |
+| `BACKUP_RETAIN` | `7` | Archives to keep locally and in S3 |
+| `S3_UPLOAD` | `false` | Set `true` to enable upload |
+| `S3_BUCKET` | — | Required when uploading |
+| `S3_PREFIX` | `backups/` | Key prefix in the bucket |
+| `S3_ENDPOINT` | — | For MinIO / R2 / non-AWS S3 |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION` | — | Standard AWS env vars |
+
 
 ---
 

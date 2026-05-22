@@ -1,6 +1,10 @@
 #!/bin/sh
 
-set -Eeuo pipefail 
+set -Eeuo pipefail
+
+if [ "${1:-}" = "backup" ]; then
+    exec /server/backup.sh
+fi
 
 echo "[Server wrapper] Starting wrapper."
 
